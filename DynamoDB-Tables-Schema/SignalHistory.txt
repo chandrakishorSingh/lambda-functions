@@ -4,6 +4,6 @@
 	- CloseDate: (Number) date in ms representing last date when stock was traded
 	- GainEWMA: (Number) exponential weighted moving average of stock price gains
 	- LossEWMA: (Number) exponential weighted moving average of stock price losses
-	- RsiArr: (Number[]) array of last 13 RSI
-	- StochRsiArr: (Number[]) array of last 2 stochastic array
-	- FastkArr: (Number[]) array of last 2 FastK values
+	- RsiArr: (Number[]) array of last 13 RSI. in chronological order. latest will be the last.
+	- StochRsiArr: (Number[]) array of last 2 stochastic array. in chronological order. latest will be the last.
+	- FastkArr: (Number[]) array of last 2 FastK values. in chronological order. latest will be the last.
