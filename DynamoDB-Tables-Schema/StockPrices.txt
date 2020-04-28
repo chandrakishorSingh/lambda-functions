@@ -1,0 +1,4 @@
+- StockPrices
+	- Symbol: (String) symbol of company
+	- StockPrice: (Number) latest value of share price
+	- Date: (String) date in YYYY-MM-DD format

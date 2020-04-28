@@ -1,0 +1,7 @@
+- Fields
+	- SignalType: (String) either 'buy' or 'sell'
+	- FastK: (Number) latest value of fastK
+	- FastD: (Number) latest value of fastD
+	- CreatedAt: (String) date in YYYY-MM-DD format
+	- Symbol: (String) symbol of company
+	- Price: (Number) price at which to buy or sell

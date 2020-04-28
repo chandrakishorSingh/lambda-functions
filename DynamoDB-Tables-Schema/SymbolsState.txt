@@ -1,0 +1,3 @@
+- Fields
+	- Description: (String) a description of table. only purpose is to satisfy the primary key criteria.
+	- Symbols: (Map) a map of symbol of company and boolean. true represents that the stock price for that company is been obtained for the day. initially all are false.

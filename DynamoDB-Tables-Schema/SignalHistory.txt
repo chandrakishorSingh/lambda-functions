@@ -1,7 +1,7 @@
 - Fields
 	- Symbol: (String) represents the NSE symbol of stock(in uppercase)
 	- ClosePrice: (Number) last close price of stock
-	- CloseDate: (Number) date in ms representing last date when stock was traded
+	- CloseDate: (String) date in YYYY-MM-DD format
 	- GainEWMA: (Number) exponential weighted moving average of stock price gains
 	- LossEWMA: (Number) exponential weighted moving average of stock price losses
 	- RsiArr: (Number[]) array of last 13 RSI. in chronological order. latest will be the last.
