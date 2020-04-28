@@ -1,11 +1,11 @@
 class Signal {
-    constructor(symbol, signalType, fastD, fastK, signalTime, signalPrice) {
+    constructor(symbol, createdAt, fastD, fastK, signalType, price) {
         this.Symbol = symbol;
-        this.CreatedAt = signalTime;
+        this.CreatedAt = createdAt;
         this.FastD = fastD;
         this.FastK = fastK;
         this.SignalType = signalType;
-        this.Price = signalPrice;
+        this.Price = price;
     }
 }
 

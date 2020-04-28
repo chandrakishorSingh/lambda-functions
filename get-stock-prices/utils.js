@@ -1,14 +1,14 @@
 const https = require('https');
 
 const AWS = require('aws-sdk');
-const dynamoDB = new AWS.DynamoDB({ region: 'us-east-2', apiVersion: '2012-08-10' });
 const unmarshall = AWS.DynamoDB.Converter.unmarshall;
 const marshall = AWS.DynamoDB.Converter.marshall;
-const lambda = new AWS.Lambda({ apiVersion: '2015-03-31' });
 
 const {StockPrice} = require('./models');
+const { dynamoPutItem, dynamoScan } = require('./dynamo');
+const { callLambda } = require('./lambda');
 
-// constants describing the type of time series
+// constants describing the types of time series
 const TS_60MIN = 'ts-60min';
 const TS_DAILY = 'ts-daily';
 
@@ -34,9 +34,9 @@ const getHttps = (url) => {
 const getApiEndPoint = (symbol, tsType) => {
     switch (tsType) {
         case TS_60MIN:
-            return `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=NSE:${escape(symbol)}&interval=60min&outputsize=full&apikey=FH3ST1MUI6674SCQ`;
+            return `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=NSE:${escape(symbol)}&interval=60min&apikey=B5GWMRIA4KKPLBSP`;
         case TS_DAILY:
-            return `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=NSE:${escape(symbol)}&outputsize=full&apikey=FH3ST1MUI6674SCQ`;
+            return `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=NSE:${escape(symbol)}&apikey=B5GWMRIA4KKPLBSP`;
     }
 };
 
@@ -76,12 +76,14 @@ const cleanResponseTimeSeries60min = (response) => {
 const cleanResponseTimeSeriesDaily = (data) => {
     const propName = 'Time Series (Daily)';
     const stockPriceData = data[propName];
+    const symbol = data['Meta Data']['2. Symbol'].split(':')[1].toUpperCase();
 
     // clean the data and returns an array of stock prices
     const stockPrices = Object.keys(stockPriceData).map((dayString) => {
         const dayData = dayString.split('-').map(item => parseInt(item, 10));
-        const date = new Date(dayData[0], dayData[1] - 1, dayData[2]);
-        return { date, price: Number(stockPriceData[dayString]['4. close']) };
+        const date = formatDate(new Date(dayData[0], dayData[1] - 1, dayData[2]));
+        return new StockPrice(symbol, date, Number(stockPriceData[dayString]['4. close']));
+        // return { date, price: Number(stockPriceData[dayString]['4. close']) };
     }).sort((a, b) => {
         return a.date > b.date ? -1: 1;
     });
@@ -104,30 +106,27 @@ const cleanResponse = (data, cleanResponseFuncName) => {
     return cleanResponseFunctions(cleanResponseFuncName)(data).slice(0, 32).reverse();
 };
 
+// gives a string repr. of given number with padding of zeros from left
+const padNumber = (num, len) => {
+    if (num.toString().length < len) {
+        let result = '';
+        for (let i = 0; i < len - num.toString().length; i++) {
+            result += '0';
+        }
+        return result + num.toString();
+    }
+    return num.toString();
+};
+
+// formats the date obj in YYYY-MM-DD format
+const formatDate = (date) => {
+    return [date.getFullYear().toString(), padNumber(date.getMonth() + 1, 2), padNumber(date.getDate(), 2)].join('-');
+};
+
 // A function that gets the prices of specified stock from API.
 const getStockPrices = async (symbol, tsType) => {
     const apiEndPoint = getApiEndPoint(symbol, tsType);
     return cleanResponse(await getHttps(apiEndPoint), tsType);
-};
-
-// Promise based dynamoDB.scan operation
-const dynamoScan = (params) => {
-    return new Promise((resolve, reject) => {
-        const awsRequest = dynamoDB.scan(params);
-        awsRequest.on('success', (res) => resolve(res));
-        awsRequest.on('error', (err) => reject(err));
-        awsRequest.send();
-    });
-};
-
-// Promise based dynamoDB.putItem operation
-const dynamoPutItem = (params) => {
-    return new Promise((resolve, reject) => {
-        const awsRequest = dynamoDB.putItem(params);
-        awsRequest.on('success', (res) => resolve(res));
-        awsRequest.on('error', (err) => reject(err));
-        awsRequest.send();
-    });
 };
 
 // Returns a map that describes companies whose stock prices have been obtained and whose yet to be obtained.
@@ -138,11 +137,11 @@ const getSymbolsState = async () => {
 };
 
 // Makes all the state of all stocks as false. This happens at the end of a single extraction cycle
-const resetSymbolsState = async (symbolsState) => {
-    for (let symbol in symbolsState.Symbols) {
-        symbolsState.Symbols[symbol] = false;
+const resetSymbolsState = async (allSymbolsState) => {
+    for (let symbol in allSymbolsState.Symbols) {
+        allSymbolsState.Symbols[symbol] = false;
     }
-    await dynamoPutItem({ Item: marshall(symbolsState), TableName: SYMBOLS_STATE_TABLE_NAME });
+    await dynamoPutItem({ Item: marshall(allSymbolsState), TableName: SYMBOLS_STATE_TABLE_NAME });
 };
 
 // A function that determines the next 5 companies whose stock prices have to be obtained.
@@ -152,42 +151,23 @@ const getCurrentSymbols = async (symbolsState) => {
     .filter((symbol) => !symbolsState.Symbols[symbol])
     .slice(0, 5);
     
-    // reset all stock's state if this is the begining of new cycle
-    if (currentSymbols.length === 0) {
-        await resetSymbolsState(symbolsState);
-        const newSymbolsState = await getSymbolsState();
-        return getCurrentSymbols(newSymbolsState);
-    }
     return currentSymbols;
 };
 
-const updateSymbolsState = async (currentSymbols, symbolsState) => {
+// it updates the state of symbols whose latest data is been obtained
+const updateSymbolsState = async (currentSymbols, allSymbolsState) => {
     for (let symbol of currentSymbols) {
-        symbolsState.Symbols[symbol] = true;
+        allSymbolsState.Symbols[symbol] = true;
     }
-    await dynamoPutItem({ Item: marshall(symbolsState), TableName: SYMBOLS_STATE_TABLE_NAME });
+    await dynamoPutItem({ Item: marshall(allSymbolsState), TableName: SYMBOLS_STATE_TABLE_NAME });
 };
 
+// stores the latest stock prices of 5 companies in StockPrices table
 const storeLatestPrices = async (latestStockPrices) => {
     for (let stockPrice of latestStockPrices) {
-        const item = { Symbol: stockPrice.symbol, Time: stockPrice.date.getTime(), Price: stockPrice.price };
+        const item = { Symbol: stockPrice.symbol, Date: stockPrice.date, Price: stockPrice.price };
         await dynamoPutItem({ Item: marshall(item), TableName: STOCK_PRICES_TABLE_NAME });
     }
-};
-
-const callLambda = (funcName, invocationType, logType, payload) => {
-    const params = {
-        FunctionName: funcName,
-        InvocationType: invocationType,
-        LogType: logType,
-        Payload: payload
-    };
-    const awsRequest = lambda.invoke(params);
-    return new Promise((resolve, reject) => {
-        awsRequest.on('succstoreLatestPricesess', resolve);
-        awsRequest.on('error', reject);
-        awsRequest.send();
-    });
 };
 
 const callGenerateSignalLambda = async (historicalStockPrices) => {

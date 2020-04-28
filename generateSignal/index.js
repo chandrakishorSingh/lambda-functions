@@ -1,25 +1,34 @@
-const { cleanData, stochasticRsi, calculateSignalType, saveSignal, wait } = require('./utils');
+const {
+    calculateSignalType,
+    saveSignal,
+    getPreviousStockDetails,
+    calculateStockDetails,
+    saveCurrentStockDetails,
+    calculateFastD
+} = require('./utils');
 
 exports.handler = async (event, context) => {
     
     // iterate over all 5 stocks
-    const historicalStockPrices5 = cleanData(event);
-    for (let stock of historicalStockPrices5) {
-        // calculate the signalType(buy | sell)
+    const stocks = event;
+    for (let stock of stocks) {
         const symbol = stock.symbol;
-        const { currentFastk: fastK, currentFastd: fastD } = stochasticRsi(stock.data.map(item => item.price));
+        // fetch previous stock details
+        const previousStockDetails = await getPreviousStockDetails(symbol);
+        // calculate current stock details
+        const currentStockDetails = calculateStockDetails(stock, previousStockDetails);
+        // calculate fastK and fastD
+        const fastK = currentStockDetails.FastkArr[currentStockDetails.FastkArr.length - 1];
+        const fastD = calculateFastD([
+            ...previousStockDetails.FastkArr,
+            fastK
+        ]);
+        
+        // save the current stock details
+        await saveCurrentStockDetails(currentStockDetails);
+        console.log(currentStockDetails);
+        // determine the signal type and save it
         const signalType = calculateSignalType(fastK, fastD);
-        
-        // logging purpose
-        console.log(stock.symbol, ' ', stock.data.length);
-        console.log('typeof', typeof (stock.data[0].date));
-        console.log(stock.data);
-        console.log(stock.data[stock.data.length - 1]);
-        
-        const signalTime = stock.data[stock.data.length - 1].date.getTime();
-        const signalPrice = stock.data[stock.data.length - 1].price;
-        await saveSignal(symbol, signalType, fastD, fastK, signalTime, signalPrice);
-        
-        await wait(1500);
+        await saveSignal(symbol, signalType, fastD, fastK, stock.date, stock.price);
     }
 };
