@@ -4,7 +4,8 @@ const {
     getPreviousStockDetails,
     calculateStockDetails,
     saveCurrentStockDetails,
-    calculateFastD
+    calculateFastD,
+    getLatestSignalBySymbol
 } = require('./utils');
 
 exports.handler = async (event, context) => {
@@ -26,9 +27,19 @@ exports.handler = async (event, context) => {
         
         // save the current stock details
         await saveCurrentStockDetails(currentStockDetails);
-        console.log(currentStockDetails);
-        // determine the signal type and save it
+
+        // determine the signal type
         const signalType = calculateSignalType(fastK, fastD);
-        await saveSignal(symbol, signalType, fastD, fastK, stock.date, stock.price);
+        
+        // get the previous signal for the current symbol
+        const previousSignal = await getLatestSignalBySymbol(symbol);
+        // save the signal only if this is opposite of previous signal type. otherwise if this is the first signal for 
+        // the symbol then store it anyway
+        if (Object.keys(previousSignal).length === 0 && signalType === 'buy') {
+            await saveSignal(symbol, signalType, fastD, fastK, stock.date, stock.price);
+        } else if (previousSignal['SignalType'] !== signalType && Object.keys(previousSignal).length > 0) {
+            await saveSignal(symbol, signalType, fastD, fastK, stock.date, stock.price);
+        }
     }
 };
+

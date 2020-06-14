@@ -1,4 +1,4 @@
-// used to handle data in more structured 
+// used to handle data in more structured  way
 class StockPrice {
     constructor(symbol, date, price) {
         this.symbol = symbol;

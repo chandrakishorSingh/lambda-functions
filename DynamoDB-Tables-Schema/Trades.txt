@@ -1,0 +1,10 @@
+- Fields
+	- PhoneNumber : (String)
+	- Trades : (Array of TradeItem)
+	- TradeItem : (Map) it has following fields.
+		- Symbol : (String)
+		- SignalType : (String) either 'buy' or 'sell'
+		- CreatedAt : (String) date in YYYY-MM-DD format
+		- Quantity : (Number)
+		- Price : (Number)
+		- TradeAmount : (Number)

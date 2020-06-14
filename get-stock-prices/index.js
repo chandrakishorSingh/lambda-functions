@@ -25,9 +25,6 @@ exports.handler = async (event) => {
         const stockPricesData = await getStockPrices(symbol, TS_DAILY);
         latestStockPrices.push({...stockPricesData[stockPricesData.length - 1]});
     }
-    
-    // for logging purpose
-    console.log('latestStockPrices', latestStockPrices);
 
     // update the SymbolsState table to reflect the changes in the state of current 5 companies
     const updateSymbolsStatePromise = updateSymbolsState(currentSymbols, allSymbolsState);
@@ -35,7 +32,7 @@ exports.handler = async (event) => {
     // store the latest stock price of each company in StockPrices table
     const storeLatestPricesPromise = storeLatestPrices(latestStockPrices);
 
-    // forward the historical stock prices to generate-signal for processing
+    // forward the latest stock prices to generate-signal for processing
     await callGenerateSignalLambda(latestStockPrices);
     
     await updateSymbolsStatePromise;

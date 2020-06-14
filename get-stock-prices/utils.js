@@ -19,6 +19,9 @@ const STOCK_PRICES_TABLE_NAME = 'StockPrices';
 // Lambda ARNs
 const GENERATE_SIGNAL_LAMBDA_ARN = 'arn:aws:lambda:us-east-2:273062589977:function:generateSignal';
 
+// Alphavantage api key
+const API_KEY = process.env.API_KEY;
+
 // A promise based https GET request.
 const getHttps = (url) => {
     return new Promise((resolve, reject) => {
@@ -34,9 +37,9 @@ const getHttps = (url) => {
 const getApiEndPoint = (symbol, tsType) => {
     switch (tsType) {
         case TS_60MIN:
-            return `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=NSE:${escape(symbol)}&interval=60min&apikey=B5GWMRIA4KKPLBSP`;
+            return `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=NSE:${escape(symbol)}&interval=60min&apikey=${API_KEY}`;
         case TS_DAILY:
-            return `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=NSE:${escape(symbol)}&apikey=B5GWMRIA4KKPLBSP`;
+            return `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=NSE:${escape(symbol)}&apikey=${API_KEY}`;
     }
 };
 
@@ -63,7 +66,6 @@ const cleanResponseTimeSeries60min = (response) => {
         const timeData = timeString.split(':');
         const date = new Date(dayData[0], dayData[1] - 1, dayData[2], timeData[0], timeData[1], timeData[2]);
         return new StockPrice(symbol, date, Number(stockPriceData[dateString]['4. close']));
-        // return { date, price: Number(stockPriceData[dateString]['4. close']) };
     }).filter((item) => item.date.getMinutes() === 45)
     .sort((a, b) => {
         return a.date > b.date ? -1: 1;
@@ -83,7 +85,6 @@ const cleanResponseTimeSeriesDaily = (data) => {
         const dayData = dayString.split('-').map(item => parseInt(item, 10));
         const date = formatDate(new Date(dayData[0], dayData[1] - 1, dayData[2]));
         return new StockPrice(symbol, date, Number(stockPriceData[dayString]['4. close']));
-        // return { date, price: Number(stockPriceData[dayString]['4. close']) };
     }).sort((a, b) => {
         return a.date > b.date ? -1: 1;
     });
@@ -91,7 +92,7 @@ const cleanResponseTimeSeriesDaily = (data) => {
     return stockPrices;
 };
 
-// A function which returns the asked 'clean response' functions
+// A function which returns the asked 'clean response' function
 const cleanResponseFunctions = (funcName) => {
     switch (funcName) {
         case TS_60MIN:

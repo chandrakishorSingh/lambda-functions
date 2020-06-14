@@ -1,0 +1,6 @@
+- Fields
+	- FirstName : (String)
+	- LastName : (String)
+	- Email : (String)
+	- PhoneNumber : (String)
+	- CreateAt : (String) date in YYYY-MM-DD format

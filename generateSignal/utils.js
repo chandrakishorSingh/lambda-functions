@@ -1,15 +1,34 @@
 const {Signal} = require('./models');
-const { dynamoPutItem, dynamoGetItem, marshall, unmarshall } = require('./dynamo');
+const { dynamoPutItem, dynamoGetItem, dynamoQuery, marshall, unmarshall } = require('./dynamo');
 
 // Constants describing table names
 const SIGNALS_TABLE_NAME = 'Signals';
 const SIGNAL_HISTORY_TABLE_NAME = 'SignalHistory';
 
 // returns average of numbers given in arr
-const average = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
+function average (arr) {
+    return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+// gives a string repr. of given number with padding of zeros from left
+function padNumber(num, len) {
+    if (num.toString().length < len) {
+        let result = '';
+        for (let i = 0; i < len - num.toString().length; i++) {
+            result += '0';
+        }
+        return result + num.toString();
+    }
+    return num.toString();
+}
+
+// formats the date obj in YYYY-MM-DD format
+function formatDate(date) {
+    return [date.getFullYear().toString(), padNumber(date.getMonth() + 1, 2), padNumber(date.getDate(), 2)].join('-');
+}
 
 // A function to calculate 14-period RSI. It requires 15 data points
-const rsi = (currentPrice, previousClosePrice, previousGainEWMA, previousLossEWMA) => {
+function rsi(currentPrice, previousClosePrice, previousGainEWMA, previousLossEWMA) {
     const change = currentPrice - previousClosePrice;
     let up = 0, down = 0;
     change > 0 ? up = change : down = Math.abs(change);
@@ -28,9 +47,9 @@ const rsi = (currentPrice, previousClosePrice, previousGainEWMA, previousLossEWM
     // create rsiData obj
     const rsiData = { rsi, gainEWMA ,lossEWMA };
     return rsiData;
-};
+}
 
-const stochasticRsi = (rsiArr) => {
+function stochasticRsi(rsiArr) {
     const currentRsi = rsiArr[rsiArr.length - 1];
     const lowestRsi = Math.min(...rsiArr);
     const highestRsi = Math.max(...rsiArr);
@@ -40,11 +59,14 @@ const stochasticRsi = (rsiArr) => {
     }
     
     return currentStochasticRsi;
-};
+}
 
-const fastK = (stochasticRsiArr) => average(stochasticRsiArr);
+function fastK(stochasticRsiArr) {
+    return average(stochasticRsiArr);
 
-const calculateStockDetails = (stock, previousStockDetails) => {
+}
+
+function calculateStockDetails(stock, previousStockDetails) {
     // calculate rsi
     const rsiData = rsi(stock.price, previousStockDetails.ClosePrice, previousStockDetails.GainEWMA, previousStockDetails.LossEWMA);
     // calculate stochastic rsi
@@ -62,44 +84,60 @@ const calculateStockDetails = (stock, previousStockDetails) => {
     currentStockDetails.Symbol = previousStockDetails.Symbol;
     currentStockDetails.CloseDate = stock.date;
     return currentStockDetails;
-};
+}
 
-const calculateFastD = (fastKArr) => average(fastKArr);
+function calculateFastD(fastKArr) {
+    return average(fastKArr);
+}
 
 // Determines whether to buy, sell or no action
-const calculateSignalType = (fastK, fastD) => {
+function calculateSignalType(fastK, fastD) {
     return fastK > fastD ? 'buy' : 'sell';
-};
+}
 
 // Saves the buy/sell signal to Signals table
-const saveSignal = (symbol, signalType, fastD, fastK, date, price) => {
+function saveSignal(symbol, signalType, fastD, fastK, date, price) {
     const signal = new Signal(symbol, date, fastD, fastK, signalType, price);
     return dynamoPutItem({ Item: marshall(signal), TableName: SIGNALS_TABLE_NAME });
-};
+}
 
 // fetches the stock details from SignalHistory table for the specified symbol
-const getPreviousStockDetails = async (symbol) => {
+async function getPreviousStockDetails (symbol) {
     const result = await dynamoGetItem({ Key: marshall({ Symbol: symbol }), TableName: SIGNAL_HISTORY_TABLE_NAME });
     console.log(unmarshall(result.data.Item));
     return unmarshall(result.data.Item);
-};
+}
 
-const saveCurrentStockDetails = async (currentStockDetails) => {
+async function saveCurrentStockDetails(currentStockDetails) {
     return dynamoPutItem({ Item: marshall(currentStockDetails), TableName: SIGNAL_HISTORY_TABLE_NAME });
-};
+}
 
-// A promise based settimeout
-const wait = (timeInMs) => {
-    return new Promise((resolve, reject) => {
-        setTimeout(resolve, timeInMs);
-    });
-};
+async function getLatestSignalBySymbol(symbol) {
+    const dateString = formatDate(new Date());
+
+    const params = {
+        TableName: SIGNALS_TABLE_NAME,
+        KeyConditionExpression: '#Symbol = :v1 AND #CreatedAt <= :v2',
+        ExpressionAttributeValues: marshall({ ':v1': symbol, ':v2' : dateString }),
+        ExpressionAttributeNames: {
+            '#CreatedAt': 'CreatedAt',
+            '#Symbol': 'Symbol'
+        },
+        Limit: 1,
+        ScanIndexForward: false
+    };
+    const result = await dynamoQuery(params).catch(err => console.log(err));
+
+    return unmarshall(result.data.Items[0]);
+    // return result;
+}
+
 
 exports.stochasticRsi = stochasticRsi;
 exports.calculateSignalType = calculateSignalType;
 exports.saveSignal = saveSignal;
-exports.wait = wait;
 exports.getPreviousStockDetails = getPreviousStockDetails;
 exports.calculateStockDetails = calculateStockDetails;
 exports.calculateFastD = calculateFastD;
 exports.saveCurrentStockDetails = saveCurrentStockDetails;
+exports.getLatestSignalBySymbol = getLatestSignalBySymbol;

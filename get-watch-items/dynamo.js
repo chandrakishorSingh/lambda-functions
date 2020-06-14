@@ -33,6 +33,7 @@ const dynamoGetItem = (params) => {
     });
 };
 
+
 // Promise based dynamoDB.query operation
 const dynamoQuery = (params) => {
     return new Promise((resolve, reject) => {
@@ -46,7 +47,6 @@ const dynamoQuery = (params) => {
 exports.dynamoScan = dynamoScan;
 exports.dynamoPutItem = dynamoPutItem;
 exports.dynamoGetItem = dynamoGetItem;
-exports.dynamoQuery = dynamoQuery;
-
 exports.unmarshall = unmarshall;
 exports.marshall = marshall;
+exports.dynamoQuery = dynamoQuery;

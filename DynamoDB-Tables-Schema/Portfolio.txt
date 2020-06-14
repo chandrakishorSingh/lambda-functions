@@ -1,0 +1,8 @@
+- Fields
+	- PhoneNumber : (String)
+	- Portfolio : (Array of PortfolioItem)
+	- PortfolioItem : (Map) it has following fields.
+		- Symbol : (String)
+		- Quantity : (Number)
+		- AvgPrice : (Number)
+		- TotalInvestment : (Number)

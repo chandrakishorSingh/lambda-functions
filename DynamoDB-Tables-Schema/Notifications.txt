@@ -1,0 +1,8 @@
+- Fields
+	- PhoneNumber : (String)
+	- Notifications : (Array of NotificationItem)
+	- NotificationItem : (Map) it has following fields.
+		- Symbol : (String)
+		- SignalType : (String) either 'buy' or 'sell'
+		- CreatedAt : (String) date in YYYY-MM-DD format
+		- Ltp : (Number) previous close price
